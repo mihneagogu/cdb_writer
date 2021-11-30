@@ -36,7 +36,7 @@ namespace cdb {
 			CDB_U16 = 2,
 			CDB_ENUM = 3,
 			CDB_U32 = 4,
-			CDB_STR // 
+			CDB_STR  
 		} value;
 
 		CdbField() = delete;
