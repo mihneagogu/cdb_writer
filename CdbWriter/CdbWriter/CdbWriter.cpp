@@ -12,6 +12,7 @@
 #include <utility>
 
 
+
 void print_usage() {
 	std::cout << "I did not recognize your command! Usage: either:" << std::endl
 		<< "./cdb_writer.exe dir" << std::endl
@@ -160,12 +161,12 @@ namespace cdb {
 			assert(fseek(this->file, 0, SEEK_END) == 0); // Make sure the seek succeeded or abort
 			long int file_end = ftell(this->file);
 			assert(fseek(this->file, cur_pos, SEEK_SET) == 0);  // Make sure the seek succeeded or abort
-			if ( (file_end - cur_pos) % type_size != 0) {
+			if ((file_end - cur_pos) % type_size != 0) {
 				cout << "The number of entries in the cdb archive does not divide the size of the type which we were given. Aborting reading file" << this->name << endl;
 				return;
 			}
 		}
-		
+
 	private:
 		CdbStructure read_structure() {
 			uint32_t numfields = read_u32_le();
@@ -186,9 +187,9 @@ namespace cdb {
 		}
 	};
 
-	void read_file(const char *path) {
+	void read_file(const char* path) {
 		FILE* f = nullptr;
-		int res = fopen_s(&f, path, "rb"); 
+		int res = fopen_s(&f, path, "rb");
 		// Keep in mind a return of 0 from fopen_s means success!
 		if (res != 0) {
 			cout << "Opening of file " << path << " failed!" << endl;
@@ -201,11 +202,11 @@ namespace cdb {
 };
 
 /* Structure of the cdb file:
- [ number_of_fields: u32, 
-	number_of_fields x string of length 0x1e, 
+ [ number_of_fields: u32,
+	number_of_fields x string of length 0x1e,
 	number_of_fields x u32 (which represent the types of each field)
 	records of the type that the cdb archive represents]
-   Keep in mind cdb integers are represented in LITTLE ENDIAN byte order 
+	 Keep in mind cdb integers are represented in LITTLE ENDIAN byte order
 */
 
 
