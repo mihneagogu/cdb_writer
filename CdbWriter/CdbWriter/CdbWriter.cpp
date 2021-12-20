@@ -1,15 +1,15 @@
-
-#include <iostream>
-#include <assert.h>
+#include <cassert>
 #include <numeric>
 #include <cstdio>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <cstdlib>
 #include <cinttypes>
 #include <utility>
+#include <iostream>
 
 
 
@@ -33,9 +33,9 @@ namespace cdb {
     enum class Inner {
       CDB_CHAR = 0,
       CDB_BOOL = 1, // God knows what it would colide with if it were only "BOOL"
-      CDB_U16 = 2,
+      CDB_I16 = 2,
       CDB_ENUM = 3,
-      CDB_U32 = 4,
+      CDB_I32 = 4,
       CDB_STR
     } value;
 
@@ -64,11 +64,12 @@ namespace cdb {
   };
 
   class CdbStructure {
-    size_t nfields;
-    vector<pair<string, CdbField>> fields;
 
     CdbStructure() = delete;
   public:
+    size_t nfields;
+    vector<pair<string, CdbField>> fields;
+
     CdbStructure(size_t num_fields, vector<string> field_names, vector<CdbField> field_sizes) : nfields(num_fields) {
       assert(field_sizes.size() == field_names.size());
       for (size_t i = 0; i < field_names.size(); i++) {
@@ -97,7 +98,8 @@ namespace cdb {
 
     char read_char() {
       char c;
-      fread(&c, sizeof(char), 1, this->file);
+      size_t read = fread(&c, sizeof(char), 1, this->file);
+      assert(read);
       return c;
     }
 
@@ -122,30 +124,18 @@ namespace cdb {
       return static_cast<bool>(c);
     }
 
-    uint16_t read_u16_le() {
-      uint16_t bits;
-      fread(&bits, sizeof(uint16_t), 1, this->file);
-      char* bytes = reinterpret_cast<char*>(&bits);
-      uint16_t res = bytes[0] | (bytes[1] << 8);
-      return res;
+    int16_t read_i16() {
+      int16_t bits;
+      size_t read = fread(&bits, sizeof(int16_t), 1, this->file);
+      assert(read);
+      return bits;
     }
 
-    uint16_t read_u16_be() {
-
-      return 0;
-    }
-
-    uint32_t read_u32_le() {
-      uint32_t bits;
-      fread(&bits, sizeof(uint32_t), 1, this->file);
-      char* bytes = reinterpret_cast<char*>(&bits);
-      uint32_t res = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
-      return res;
-    }
-
-    uint32_t read_u32_be() {
-
-      return 0;
+    int32_t read_u32_le() {
+      int32_t bits;
+      size_t read = fread(&bits, sizeof(int32_t), 1, this->file);
+      assert(read);
+      return bits;
     }
 
     ~CdbFileReader() {
@@ -164,6 +154,10 @@ namespace cdb {
       if ((file_end - cur_pos) % type_size != 0) {
         cout << "The number of entries in the cdb archive does not divide the size of the type which we were given. Aborting reading file" << this->name << endl;
         return;
+      }
+      size_t nobjs = (file_end - cur_pos) / type_size;
+      for (size_t i = 0; i < nobjs; i++) {
+        read_and_output_obj(type_structure);
       }
     }
 
@@ -185,7 +179,43 @@ namespace cdb {
 
       return CdbStructure(nfields, std::move(field_names), std::move(field_types));
     }
+
+    void read_and_output_obj(const CdbStructure& obj) {
+      std::cout << '{' << std::endl;
+      for (size_t i = 0; i < obj.nfields; i++) {
+        auto& field = obj.fields[i];
+        std::cout << "\t\"" << field.first << "\":";
+
+        switch (field.second.value) {
+        case CdbField::Inner::CDB_CHAR:
+          std::cout << read_char() << std::endl;
+          break;
+        case CdbField::Inner::CDB_BOOL:
+          std::cout << (read_bool() ? "true" : "false");
+          break;
+        case CdbField::Inner::CDB_I16:
+          std::cout << read_i16();
+          break;
+        case CdbField::Inner::CDB_I32:
+          std::cout << read_u32_le();
+          break;
+        case CdbField::Inner::CDB_STR:
+          std::cout << '"' << read_str() << '"';
+          break;
+        case CdbField::Inner::CDB_ENUM:
+        default:
+          throw std::runtime_error("Unknown cdb field");
+        }
+
+        if (i != obj.nfields - 1) {
+          std::cout << ',';
+        }
+        std::cout << std::endl;
+      }
+      std::cout << '}' << std::endl;
+    }
   };
+
 
   void read_file(const char* path) {
     FILE* f = nullptr;
@@ -202,12 +232,12 @@ namespace cdb {
 };
 
 /* Structure of the cdb file:
- [ number_of_fields: u32,
-  number_of_fields x string of length 0x1e,
-  number_of_fields x u32 (which represent the types of each field)
-  records of the type that the cdb archive represents]
+   [ number_of_fields: i32,
+   number_of_fields x string of length 0x1e,
+   number_of_fields x i32 (which represent the types of each field)
+   records of the type that the cdb archive represents]
    Keep in mind cdb integers are represented in LITTLE ENDIAN byte order
-*/
+   */
 
 
 
@@ -226,4 +256,3 @@ int main(int argc, char** argv)
   }
   return EXIT_SUCCESS;
 }
-
